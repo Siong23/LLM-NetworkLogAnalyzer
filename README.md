@@ -26,29 +26,29 @@ Network environments generate massive amounts of log data that are difficult to 
 ## 🖼️ Architecture
 ```
 +--------------------------+
-| Network Log Sources |
-| (5G Core, Firewalls, |
-| Routers, Syslog, etc.) |
+| Network Log Sources      |
+| (5G Core, Firewalls,     |
+| Routers, Syslog, etc.)   |
 +------------+-------------+
-↓
+             ↓
 +--------------------------+
-| Log Parser & Formatter |
-| - Regex rules |
-| - Logstash, Fluentd |
+| Log Parser & Formatter   |
+| - Regex rules            |
+| - Logstash, Fluentd      |
 +------------+-------------+
-↓
+             ↓
 +--------------------------+
-| LLM Inference Engine |
-| - Prompt templates |
-| - Model backends (OpenAI, |
-| HuggingFace, Local) |
+| LLM Inference Engine     |
+| - Prompt templates       |
+| - Model backends (OpenAI,|
+| HuggingFace, Local)      |
 +------------+-------------+
-↓
+             ↓
 +--------------------------+
-| Output & Dashboard |
-| - Alerts & Summaries |
-| - Visualizations (optional)|
-| - JSON / CSV / UI |
+| Output & Dashboard       |
+| - Alerts & Summaries     |
+| - Visualizations         |
+| - JSON / CSV / UI        |
 +--------------------------+
 ```
 
