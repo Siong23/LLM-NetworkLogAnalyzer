@@ -1,0 +1,115 @@
+{
+  "httpflood": {
+    "num_samples": 70411,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 0.026791192591190338,
+      "p95": 0.7059637904167175
+    }
+  },
+  "icmpflood": {
+    "num_samples": 588,
+    "feature_dim": 25,
+    "index_type": "Flat",
+    "calibration": {
+      "p5": 0.0,
+      "p95": 0.0
+    }
+  },
+  "slowratedos": {
+    "num_samples": 36487,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 0.019964179024100304,
+      "p95": 0.3356470465660095
+    }
+  },
+  "synflood": {
+    "num_samples": 4889,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 5.1097867981297895e-05,
+      "p95": 0.01833145134150982
+    }
+  },
+  "synscan": {
+    "num_samples": 10090,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 0.0,
+      "p95": 3.051757857974735e-06
+    }
+  },
+  "tcpconnectscan": {
+    "num_samples": 10170,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 1.258850079466356e-05,
+      "p95": 7.287981134140864e-05
+    }
+  },
+  "udpflood": {
+    "num_samples": 114497,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 0.0,
+      "p95": 2.28881845032447e-06
+    }
+  },
+  "udpscan": {
+    "num_samples": 7952,
+    "feature_dim": 25,
+    "index_type": "IVFFlat_nlist50",
+    "calibration": {
+      "p5": 0.0,
+      "p95": 1.5258789289873675e-06
+    }
+  },
+  "benign": {
+    "num_samples": 238653,
+    "feature_dim": 25,
+    "nlist": 100,
+    "index_type": "IVFFlat",
+    "calibration": {
+      "p5": 0.0,
+      "p95": 0.00470550823956728
+    }
+  },
+  "feature_selection": {
+    "selected_features": [
+      "AckDat",
+      "DstLoss",
+      "DstTCPBase",
+      "DstWin",
+      "Dur",
+      "Loss",
+      "Max",
+      "Mean",
+      "Min",
+      "Offset",
+      "RunTime",
+      "SrcTCPBase",
+      "Sum",
+      "TcpRtt",
+      "dHops",
+      "dMeanPktSz",
+      "dTtl",
+      "sHops",
+      "sMeanPktSz",
+      "sTtl",
+      "sVid",
+      "Proto_le",
+      "dDSb_le",
+      "Cause_le",
+      "State_le"
+    ],
+    "total_features": 47,
+    "selected_count": 25
+  }
+}

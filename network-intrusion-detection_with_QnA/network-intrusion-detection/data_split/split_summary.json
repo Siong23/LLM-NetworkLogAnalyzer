@@ -1,0 +1,61 @@
+{
+  "config": {
+    "input": "combined.csv",
+    "output_dir": "data_split",
+    "test_frac": 0.5,
+    "seed": 42,
+    "group": "attack_type"
+  },
+  "counts": {
+    "total": 1215890,
+    "index_total": 608235,
+    "test_total": 607655,
+    "per_class": {
+      "Benign": {
+        "index": 238653,
+        "test": 239084,
+        "total": 477737
+      },
+      "Malicious::attack_type::SYNScan": {
+        "index": 10090,
+        "test": 9953,
+        "total": 20043
+      },
+      "Malicious::attack_type::TCPConnectScan": {
+        "index": 10170,
+        "test": 9882,
+        "total": 20052
+      },
+      "Malicious::attack_type::UDPScan": {
+        "index": 7952,
+        "test": 7954,
+        "total": 15906
+      },
+      "Malicious::attack_type::ICMPFlood": {
+        "index": 588,
+        "test": 567,
+        "total": 1155
+      },
+      "Malicious::attack_type::UDPFlood": {
+        "index": 228995,
+        "test": 228345,
+        "total": 457340
+      },
+      "Malicious::attack_type::SYNFlood": {
+        "index": 4889,
+        "test": 4832,
+        "total": 9721
+      },
+      "Malicious::attack_type::HTTPFlood": {
+        "index": 70411,
+        "test": 70401,
+        "total": 140812
+      },
+      "Malicious::attack_type::SlowrateDoS": {
+        "index": 36487,
+        "test": 36637,
+        "total": 73124
+      }
+    }
+  }
+}

@@ -1,0 +1,871 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Intrusion Detection System Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .flow-item { transition: all 0.3s ease; }
+        .flow-item.new { animation: slideIn 0.5s ease; }
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .rag-indicator {
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
+            animation: ragGlow 2s ease-in-out infinite alternate;
+        }
+        @keyframes ragGlow {
+            from { box-shadow: 0 0 5px rgba(251, 191, 36, 0.5); }
+            to { box-shadow: 0 0 15px rgba(251, 191, 36, 0.8); }
+        }
+        .question-input {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .analysis-card {
+            transition: all 0.3s ease;
+        }
+        .analysis-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="app" class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="gradient-bg rounded-lg p-6 mb-8 text-white">
+            <h1 class="text-3xl font-bold mb-2">
+                <i class="fas fa-shield-alt mr-3"></i>
+                Network Intrusion Detection System
+            </h1>
+            <p class="text-blue-100">
+                Real-time network flow analysis using FAISS indexing and GPU-accelerated DeepSeek-R1-Distill-Llama-8B with Historical Analysis (RAG)
+            </p>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-cog text-gray-500"></i>
+                        <span class="font-medium">Mode:</span>
+                        <select id="modeSelect" class="px-3 py-1 border rounded-md">
+                            <option value="true">Demo Mode (1 LLM analysis per attack type)</option>
+                            <option value="false">Production Mode (All malicious flows analyzed)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="checkbox" id="gpuToggle" checked class="rounded">
+                        <label for="gpuToggle" class="text-sm">Use GPU Acceleration</label>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button id="startBtn" class="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+                        <i class="fas fa-play"></i>
+                        <span>Start Detection</span>
+                    </button>
+                    
+                    <button id="stopBtn" class="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition" disabled>
+                        <i class="fas fa-pause"></i>
+                        <span>Stop Detection</span>
+                    </button>
+                    
+                    <button id="resetBtn" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition">
+                        <i class="fas fa-sync-alt"></i>
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="grid grid-cols-5 gap-4">
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 transition hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-600 font-medium">Benign Flows</p>
+                            <p id="benignCount" class="text-2xl font-bold text-green-800">0</p>
+                        </div>
+                        <i class="fas fa-check-circle text-green-500 text-2xl"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 transition hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-yellow-600 font-medium">Suspicious Flows</p>
+                            <p id="suspiciousCount" class="text-2xl font-bold text-yellow-800">0</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 transition hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-red-600 font-medium">Malicious Flows</p>
+                            <p id="maliciousCount" class="text-2xl font-bold text-red-800">0</p>
+                        </div>
+                        <i class="fas fa-shield-alt text-red-500 text-2xl"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 transition hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-600 font-medium">LLM Analyzed</p>
+                            <p id="analyzedCount" class="text-2xl font-bold text-blue-800">0</p>
+                        </div>
+                        <i class="fas fa-brain text-blue-500 text-2xl"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 transition hover:shadow-md">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-600 font-medium">Questions Answered</p>
+                            <p id="questionsCount" class="text-2xl font-bold text-purple-800">0</p>
+                        </div>
+                        <i class="fas fa-question-circle text-purple-500 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <!-- Real-time Flow Monitor -->
+            <div class="bg-white rounded-lg shadow-sm border">
+                <div class="p-4 border-b">
+                    <h2 class="text-xl font-semibold text-gray-800">Real-time Flow Monitor</h2>
+                    <p class="text-sm text-gray-600">Live network flow classification using FAISS indexing</p>
+                </div>
+                
+                <div class="p-4 max-h-96 overflow-y-auto">
+                    <div id="flowContainer" class="space-y-2">
+                        <div id="emptyFlowState" class="text-center text-gray-500 py-8">
+                            <i class="fas fa-network-wired text-4xl mb-3 opacity-50"></i>
+                            <p>No network flows detected yet.</p>
+                            <p class="text-sm mt-1">Start the detection to see real-time analysis.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LLM Analysis Panel -->
+            <div class="bg-white rounded-lg shadow-sm border">
+                <div class="p-4 border-b">
+                    <h2 class="text-xl font-semibold text-gray-800">DeepSeek LLM Analysis</h2>
+                    <p class="text-sm text-gray-600">Detailed threat analysis for malicious flows</p>
+                </div>
+                
+                <div id="analysisContainer" class="p-4 max-h-96 overflow-y-auto">
+                    <div id="emptyAnalysisState" class="text-center text-gray-500 py-8">
+                        <i class="fas fa-shield-alt text-4xl mb-3 opacity-50"></i>
+                        <p>No malicious flows detected yet.</p>
+                        <p class="text-sm mt-1">Malicious flows will be automatically sent to the LLM for detailed analysis.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Interface -->
+            <div class="bg-white rounded-lg shadow-sm border">
+                <div class="p-4 border-b">
+                    <h2 class="text-xl font-semibold text-gray-800">AI Assistant Q&A</h2>
+                    <p class="text-sm text-gray-600">Ask questions about specific threat analyses</p>
+                </div>
+                
+                <div class="p-4">
+                    <!-- Question Form -->
+                    <div id="questionForm" class="mb-4">
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Analysis:</label>
+                            <select id="analysisSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select an analysis to ask about...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Your Question:</label>
+                            <textarea 
+                                id="questionInput" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 question-input"
+                                placeholder="Ask anything about the selected analysis... Examples:&#10;• What specific indicators suggest this is a SYN flood?&#10;• How can we prevent this type of attack?&#10;• What would be the impact if this attack succeeded?"
+                                rows="3"
+                            ></textarea>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button id="askQuestionBtn" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition disabled:bg-gray-400" disabled>
+                                <i class="fas fa-question mr-2"></i>
+                                Ask Question
+                            </button>
+                            <button id="pauseBtn" class="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 transition">
+                                <i class="fas fa-pause mr-2"></i>
+                                Pause Analysis
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question History -->
+                    <div id="questionContainer" class="max-h-64 overflow-y-auto">
+                        <div id="emptyQuestionState" class="text-center text-gray-500 py-8">
+                            <i class="fas fa-comments text-4xl mb-3 opacity-50"></i>
+                            <p>No questions asked yet.</p>
+                            <p class="text-sm mt-1">Select an analysis and ask questions to get detailed insights.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div id="systemStatus" class="mt-6 hidden">
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 bg-green-500 rounded-full pulse"></div>
+                    <span class="text-green-800 font-medium">
+                        System Active - Real-time flow monitoring in progress
+                    </span>
+                    <span id="modeDisplay" class="text-green-600 text-sm"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- GPU Status -->
+        <div id="gpuStatus" class="mt-4 hidden">
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-microchip text-purple-600"></i>
+                        <span class="text-purple-800 font-medium">GPU Status</span>
+                        <span id="gpuName" class="text-purple-600 text-sm"></span>
+                    </div>
+                    <div class="text-right text-sm text-purple-700">
+                        <div>Memory: <span id="gpuMemory">N/A</span></div>
+                        <div>Avg Time: <span id="gpuAvgTime">N/A</span></div>
+                        <div>RAG Entries: <span id="ragEntries">N/A</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+        
+        // DOM elements
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const modeSelect = document.getElementById('modeSelect');
+        const gpuToggle = document.getElementById('gpuToggle');
+        const flowContainer = document.getElementById('flowContainer');
+        const analysisContainer = document.getElementById('analysisContainer');
+        const questionContainer = document.getElementById('questionContainer');
+        const systemStatus = document.getElementById('systemStatus');
+        const gpuStatus = document.getElementById('gpuStatus');
+        const modeDisplay = document.getElementById('modeDisplay');
+        const emptyFlowState = document.getElementById('emptyFlowState');
+        const emptyAnalysisState = document.getElementById('emptyAnalysisState');
+        const emptyQuestionState = document.getElementById('emptyQuestionState');
+        
+        // Question interface elements
+        const analysisSelect = document.getElementById('analysisSelect');
+        const questionInput = document.getElementById('questionInput');
+        const askQuestionBtn = document.getElementById('askQuestionBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        
+        // State
+        let isRunning = false;
+        let currentAnalysis = null;
+        let flowCount = 0;
+        let availableAnalyses = [];
+        let isAnalysisPaused = false;
+        
+        // Event listeners
+        startBtn.addEventListener('click', startDetection);
+        stopBtn.addEventListener('click', stopDetection);
+        resetBtn.addEventListener('click', resetSystem);
+        askQuestionBtn.addEventListener('click', askQuestion);
+        pauseBtn.addEventListener('click', togglePauseAnalysis);
+        
+        // Question form validation
+        analysisSelect.addEventListener('change', validateQuestionForm);
+        questionInput.addEventListener('input', validateQuestionForm);
+        
+        function validateQuestionForm() {
+            const hasAnalysis = analysisSelect.value !== '';
+            const hasQuestion = questionInput.value.trim() !== '';
+            askQuestionBtn.disabled = !(hasAnalysis && hasQuestion);
+        }
+        
+        // Socket event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+        
+        socket.on('initial_state', (data) => {
+            console.log('Received initial state:', data);
+            updateStats(data.stats);
+            updateFlows(data.flows);
+            updateAnalyses(data.analyses);
+            updateQuestions(data.questions);
+            updateAvailableAnalyses(data.available_analyses);
+            updateSystemStatus(data.running);
+            updateGPUStatus(data.gpu_available, data.gpu_stats);
+        });
+        
+        socket.on('flow_update', (data) => {
+            addFlow(data.flow);
+            updateStats(data.stats);
+        });
+        
+        socket.on('analysis_complete', (data) => {
+            showAnalysisResult(data.analysis);
+            updateAvailableAnalyses(); // Refresh available analyses
+        });
+        
+        socket.on('question_answered', (data) => {
+            showQuestionResult(data);
+            updateStats(); // Refresh stats to show question count
+        });
+        
+        socket.on('gpu_stats', (data) => {
+            updateGPUStats(data);
+        });
+        
+        socket.on('system_reset', () => {
+            resetUI();
+        });
+        
+        // Functions
+        async function startDetection() {
+            const demoMode = modeSelect.value === 'true';
+            const useGPU = gpuToggle.checked;
+            
+            try {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+                
+                const response = await fetch('/api/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        demo_mode: demoMode,
+                        use_gpu: useGPU 
+                    }),
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    updateSystemStatus(true);
+                    modeDisplay.textContent = demoMode ? '(Demo Mode)' : '(Production Mode)';
+                    updateGPUStatus(result.gpu_info?.available, null, result.gpu_info);
+                } else {
+                    alert('Failed to start detection: ' + result.error);
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play"></i> Start Detection';
+                }
+            } catch (error) {
+                alert('Error starting detection: ' + error.message);
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-play"></i> Start Detection';
+            }
+        }
+        
+        async function stopDetection() {
+            try {
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+                
+                const response = await fetch('/api/stop', {
+                    method: 'POST',
+                });
+                
+                if (response.ok) {
+                    updateSystemStatus(false);
+                } else {
+                    const result = await response.json();
+                    alert('Failed to stop detection: ' + result.error);
+                }
+                
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fas fa-pause"></i> Stop Detection';
+            } catch (error) {
+                alert('Error stopping detection: ' + error.message);
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fas fa-pause"></i> Stop Detection';
+            }
+        }
+        
+        async function resetSystem() {
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                });
+                
+                if (response.ok) {
+                    resetUI();
+                } else {
+                    const result = await response.json();
+                    alert('Failed to reset system: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error resetting system: ' + error.message);
+            }
+        }
+        
+        async function askQuestion() {
+            const flowId = analysisSelect.value;
+            const question = questionInput.value.trim();
+            
+            if (!flowId || !question) {
+                alert('Please select an analysis and enter a question.');
+                return;
+            }
+            
+            try {
+                askQuestionBtn.disabled = true;
+                askQuestionBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                
+                const response = await fetch('/api/ask-question', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        flow_id: flowId,
+                        question: question
+                    }),
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    questionInput.value = '';
+                    validateQuestionForm();
+                    
+                    // Show processing state
+                    showQuestionProcessing(question);
+                } else {
+                    alert('Failed to ask question: ' + result.error);
+                }
+                
+                askQuestionBtn.disabled = false;
+                askQuestionBtn.innerHTML = '<i class="fas fa-question mr-2"></i> Ask Question';
+            } catch (error) {
+                alert('Error asking question: ' + error.message);
+                askQuestionBtn.disabled = false;
+                askQuestionBtn.innerHTML = '<i class="fas fa-question mr-2"></i> Ask Question';
+            }
+        }
+        
+        async function togglePauseAnalysis() {
+            try {
+                const endpoint = isAnalysisPaused ? '/api/resume-analysis' : '/api/pause-analysis';
+                const response = await fetch(endpoint, { method: 'POST' });
+                
+                if (response.ok) {
+                    isAnalysisPaused = !isAnalysisPaused;
+                    updatePauseButton();
+                } else {
+                    const result = await response.json();
+                    alert('Failed to toggle analysis: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error toggling analysis: ' + error.message);
+            }
+        }
+        
+        function updatePauseButton() {
+            if (isAnalysisPaused) {
+                pauseBtn.innerHTML = '<i class="fas fa-play mr-2"></i> Resume Analysis';
+                pauseBtn.className = 'bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition';
+            } else {
+                pauseBtn.innerHTML = '<i class="fas fa-pause mr-2"></i> Pause Analysis';
+                pauseBtn.className = 'bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 transition';
+            }
+        }
+        
+        async function updateAvailableAnalyses(newData = null) {
+            if (newData) {
+                availableAnalyses = newData;
+            } else {
+                try {
+                    const response = await fetch('/api/available-analyses');
+                    if (response.ok) {
+                        availableAnalyses = await response.json();
+                    }
+                } catch (error) {
+                    console.error('Error fetching available analyses:', error);
+                }
+            }
+            
+            // Update select options
+            analysisSelect.innerHTML = '<option value="">Select an analysis to ask about...</option>';
+            availableAnalyses.forEach(analysis => {
+                const option = document.createElement('option');
+                option.value = analysis.flow_id;
+                const ragIndicator = analysis.rag_assisted ? '🔍 ' : '';
+                option.textContent = `${ragIndicator}${analysis.attack_type} - ${analysis.threat_level} (${new Date(analysis.timestamp).toLocaleTimeString()})`;
+                analysisSelect.appendChild(option);
+            });
+            
+            validateQuestionForm();
+        }
+        
+        function updateSystemStatus(running) {
+            isRunning = running;
+            startBtn.disabled = running;
+            stopBtn.disabled = !running;
+            modeSelect.disabled = running;
+            gpuToggle.disabled = running;
+            
+            if (running) {
+                systemStatus.classList.remove('hidden');
+                startBtn.innerHTML = '<i class="fas fa-play"></i> Start Detection';
+            } else {
+                systemStatus.classList.add('hidden');
+                startBtn.innerHTML = '<i class="fas fa-play"></i> Start Detection';
+                stopBtn.innerHTML = '<i class="fas fa-pause"></i> Stop Detection';
+            }
+        }
+        
+        function updateGPUStatus(available, stats, info) {
+            if (available && (stats || info)) {
+                gpuStatus.classList.remove('hidden');
+                
+                if (info) {
+                    document.getElementById('gpuName').textContent = info.device_name || 'Unknown GPU';
+                }
+                
+                if (stats) {
+                    updateGPUStats(stats);
+                }
+            } else if (!available) {
+                gpuStatus.classList.add('hidden');
+            }
+        }
+        
+        function updateGPUStats(stats) {
+            if (stats.gpu_memory_allocated_gb !== undefined) {
+                document.getElementById('gpuMemory').textContent = 
+                    stats.gpu_memory_allocated_gb.toFixed(1) + 'GB';
+            }
+            if (stats.average_inference_time !== undefined) {
+                document.getElementById('gpuAvgTime').textContent = 
+                    stats.average_inference_time.toFixed(1) + 's';
+            }
+            if (stats.rag_index_size !== undefined) {
+                document.getElementById('ragEntries').textContent = stats.rag_index_size;
+            }
+        }
+        
+        function updateStats(stats) {
+            if (!stats) return;
+            document.getElementById('benignCount').textContent = stats.benign || 0;
+            document.getElementById('suspiciousCount').textContent = stats.suspicious || 0;
+            document.getElementById('maliciousCount').textContent = stats.malicious || 0;
+            document.getElementById('analyzedCount').textContent = stats.analyzed || 0;
+            document.getElementById('questionsCount').textContent = stats.questions_answered || 0;
+        }
+        
+        function getClassificationClasses(classification) {
+            switch (classification) {
+                case 'benign':
+                    return 'bg-green-100 border-green-300 text-green-800';
+                case 'suspicious':
+                    return 'bg-yellow-100 border-yellow-300 text-yellow-800';
+                case 'malicious':
+                    return 'bg-red-100 border-red-300 text-red-800';
+                default:
+                    return 'bg-gray-100 border-gray-300 text-gray-800';
+            }
+        }
+        
+        function getClassificationIcon(classification) {
+            switch (classification) {
+                case 'benign':
+                    return 'fas fa-check-circle';
+                case 'suspicious':
+                    return 'fas fa-exclamation-triangle';
+                case 'malicious':
+                    return 'fas fa-shield-alt';
+                default:
+                    return 'fas fa-question-circle';
+            }
+        }
+        
+        function addFlow(flow) {
+            const flowElement = createFlowElement(flow);
+            
+            // Hide empty state
+            if (emptyFlowState) {
+                emptyFlowState.style.display = 'none';
+            }
+            
+            // Add new flow at the top
+            flowContainer.insertBefore(flowElement, flowContainer.firstChild);
+            
+            // Keep only last 20 flows
+            while (flowContainer.children.length > 21) { // +1 for empty state
+                flowContainer.removeChild(flowContainer.lastChild);
+            }
+            
+            flowCount++;
+        }
+        
+        function createFlowElement(flow) {
+            const div = document.createElement('div');
+            div.className = `flow-item new p-3 rounded-lg border ${getClassificationClasses(flow.classification)}`;
+            
+            const timestamp = new Date(flow.timestamp).toLocaleTimeString();
+            
+            div.innerHTML = `
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center space-x-2">
+                        <i class="${getClassificationIcon(flow.classification)} w-4 h-4"></i>
+                        <span class="font-medium capitalize">${flow.classification}</span>
+                        ${flow.attack_type ? `<span class="text-xs px-2 py-1 bg-black bg-opacity-10 rounded">${flow.attack_type}</span>` : ''}
+                    </div>
+                    <span class="text-xs opacity-75">${timestamp}</span>
+                </div>
+                
+                <div class="text-sm space-y-1">
+                    <div class="flex justify-between">
+                        <span>${flow.src_ip}:${flow.src_port} → ${flow.dst_ip}:${flow.dst_port}</span>
+                        <span class="font-mono">${flow.protocol}</span>
+                    </div>
+                    <div class="flex justify-between text-xs opacity-75">
+                        <span>${flow.bytes} bytes, ${flow.packets} packets</span>
+                        <span>Confidence: ${(flow.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                </div>
+            `;
+            
+            return div;
+        }
+        
+        function updateFlows(flows) {
+            // Clear existing flows except empty state
+            Array.from(flowContainer.children).forEach(child => {
+                if (child.id !== 'emptyFlowState') {
+                    flowContainer.removeChild(child);
+                }
+            });
+            
+            if (flows && flows.length > 0) {
+                emptyFlowState.style.display = 'none';
+                flows.forEach(flow => {
+                    const flowElement = createFlowElement(flow);
+                    flowContainer.appendChild(flowElement);
+                });
+            } else {
+                emptyFlowState.style.display = 'block';
+            }
+        }
+        
+        function showAnalysisResult(analysis) {
+            emptyAnalysisState.style.display = 'none';
+            
+            // RAG indicator
+            const ragIndicator = analysis.rag_assisted ? 
+                '<div class="rag-indicator text-white text-xs px-2 py-1 rounded-full mb-2 inline-block"><i class="fas fa-search mr-1"></i>Historical Analysis Used</div>' : '';
+            
+            analysisContainer.innerHTML = `
+                <div class="space-y-4 analysis-card">
+                    ${ragIndicator}
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i class="fas fa-shield-alt text-red-600"></i>
+                            <span class="font-semibold text-red-800">Threat Detected</span>
+                            <span class="px-2 py-1 bg-red-600 text-white text-xs rounded">
+                                ${analysis.threat_level}
+                            </span>
+                        </div>
+                        <p class="text-red-700 text-sm mb-2">
+                            <strong>Attack Vector:</strong> ${analysis.attack_type}
+                        </p>
+                        <p class="text-red-600 text-sm">
+                            ${analysis.description}
+                        </p>
+                    </div>
+
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <h4 class="font-semibold text-yellow-800 mb-2">Recommended Actions:</h4>
+                        <ul class="text-sm text-yellow-700 space-y-1">
+                            ${analysis.recommendations.map(rec => `
+                                <li class="flex items-start space-x-2">
+                                    <span class="text-yellow-600 mt-1">•</span>
+                                    <span>${rec}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="font-semibold text-blue-800 mb-2">Technical Details:</h4>
+                        <div class="text-sm text-blue-700 space-y-1">
+                            <p><strong>Risk Score:</strong> ${analysis.risk_score}/100</p>
+                            <p><strong>Confidence:</strong> ${(analysis.technical_details.confidence * 100).toFixed(1)}%</p>
+                            <p><strong>Protocol:</strong> ${analysis.technical_details.protocol}</p>
+                            <p><strong>Analysis Time:</strong> ${analysis.technical_details.analysis_time.toFixed(2)}s</p>
+                            <p><strong>Analysis #:</strong> ${analysis.analysis_number}</p>
+                            <p><strong>Flow ID:</strong> ${analysis.flow_id}</p>
+                            ${analysis.rag_assisted ? '<p><strong>🔍 Enhanced by Historical Data</strong></p>' : ''}
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-2">Technical Analysis:</h4>
+                        <p class="text-sm text-gray-700">${analysis.technical_analysis}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function showQuestionProcessing(question) {
+            emptyQuestionState.style.display = 'none';
+            
+            const questionElement = document.createElement('div');
+            questionElement.className = 'border border-blue-200 rounded-lg p-4 mb-4 bg-blue-50';
+            questionElement.innerHTML = `
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p class="text-blue-700 font-medium">Processing question...</p>
+                    <p class="text-blue-600 text-sm mt-1">${question}</p>
+                </div>
+            `;
+            
+            questionContainer.insertBefore(questionElement, questionContainer.firstChild);
+        }
+        
+        function showQuestionResult(data) {
+            emptyQuestionState.style.display = 'none';
+            
+            // Remove any processing state
+            const processingElements = questionContainer.querySelectorAll('.bg-blue-50');
+            processingElements.forEach(el => el.remove());
+            
+            const questionElement = document.createElement('div');
+            questionElement.className = `border rounded-lg p-4 mb-4 ${data.error ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`;
+            
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+            
+            questionElement.innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-question-circle ${data.error ? 'text-red-600' : 'text-green-600'}"></i>
+                            <span class="font-medium ${data.error ? 'text-red-800' : 'text-green-800'}">Question</span>
+                            <span class="text-xs px-2 py-1 ${data.error ? 'bg-red-200 text-red-700' : 'bg-green-200 text-green-700'} rounded">
+                                ${data.error ? 'Error' : 'Answered'}
+                            </span>
+                        </div>
+                        <span class="text-xs ${data.error ? 'text-red-600' : 'text-green-600'}">${timestamp}</span>
+                    </div>
+                    
+                    <div class="bg-white bg-opacity-50 rounded p-3">
+                        <p class="text-sm font-medium ${data.error ? 'text-red-700' : 'text-green-700'} mb-2">Q: ${data.question}</p>
+                        <p class="text-sm ${data.error ? 'text-red-600' : 'text-green-600'}">${data.answer}</p>
+                    </div>
+                    
+                    ${!data.error && data.inference_time ? `
+                        <div class="text-xs ${data.error ? 'text-red-500' : 'text-green-500'}">
+                            Response time: ${data.inference_time.toFixed(2)}s
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            questionContainer.insertBefore(questionElement, questionContainer.firstChild);
+            
+            // Keep only last 10 questions
+            while (questionContainer.children.length > 11) { // +1 for empty state
+                questionContainer.removeChild(questionContainer.lastChild);
+            }
+        }
+        
+        function updateAnalyses(analyses) {
+            if (analyses && analyses.length > 0) {
+                showAnalysisResult(analyses[analyses.length - 1]);
+            } else {
+                emptyAnalysisState.style.display = 'block';
+            }
+        }
+        
+        function updateQuestions(questions) {
+            if (questions && questions.length > 0) {
+                emptyQuestionState.style.display = 'none';
+                questions.slice(-5).reverse().forEach(question => {
+                    showQuestionResult(question);
+                });
+            } else {
+                emptyQuestionState.style.display = 'block';
+            }
+        }
+        
+        function resetUI() {
+            // Reset flows
+            Array.from(flowContainer.children).forEach(child => {
+                if (child.id !== 'emptyFlowState') {
+                    flowContainer.removeChild(child);
+                }
+            });
+            emptyFlowState.style.display = 'block';
+            
+            // Reset analysis
+            analysisContainer.innerHTML = '';
+            analysisContainer.appendChild(emptyAnalysisState);
+            emptyAnalysisState.style.display = 'block';
+            
+            // Reset questions
+            Array.from(questionContainer.children).forEach(child => {
+                if (child.id !== 'emptyQuestionState') {
+                    questionContainer.removeChild(child);
+                }
+            });
+            emptyQuestionState.style.display = 'block';
+            
+            // Reset form
+            analysisSelect.innerHTML = '<option value="">Select an analysis to ask about...</option>';
+            questionInput.value = '';
+            validateQuestionForm();
+            
+            // Reset stats
+            updateStats({benign: 0, suspicious: 0, malicious: 0, analyzed: 0, questions_answered: 0});
+            
+            // Reset status
+            updateSystemStatus(false);
+            gpuStatus.classList.add('hidden');
+            
+            flowCount = 0;
+            availableAnalyses = [];
+            isAnalysisPaused = false;
+            updatePauseButton();
+        }
+        
+        // Initialize UI
+        resetUI();
+    </script>
+</body>
+</html>
